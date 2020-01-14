@@ -58,6 +58,8 @@
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 void EPD_test(void);
+UBYTE *BlackImage;
+int key_num = -1;
 
 /* USER CODE END PFP */
 
@@ -92,13 +94,19 @@ void NVIC_config() {
 void EXTI0_IRQHandler() {
     if (GET_REG(EXTI->PR1, EXTI_PR1_PIF0)) {
         int x = keypad_scan(0);
-        SET_REG(EXTI->PR1, EXTI_PR1_PIF0, EXTI_PR1_PIF0);
+        if(x != -1) {
+            key_num = x;
+        }
+		SET_REG(EXTI->PR1, EXTI_PR1_PIF0, EXTI_PR1_PIF0);
     }
 }
 
 void EXTI1_IRQHandler() {
     if (GET_REG(EXTI->PR1, EXTI_PR1_PIF1)) {
         int x = keypad_scan(1);
+        if(x != -1) {
+            key_num = x;
+        }
         SET_REG(EXTI->PR1, EXTI_PR1_PIF1, EXTI_PR1_PIF1);
     }
 }
@@ -106,6 +114,9 @@ void EXTI1_IRQHandler() {
 void EXTI2_IRQHandler() {
     if (GET_REG(EXTI->PR1, EXTI_PR1_PIF2)) {
         int x = keypad_scan(2);
+        if(x != -1) {
+            key_num = x;
+        }
         SET_REG(EXTI->PR1, EXTI_PR1_PIF2, EXTI_PR1_PIF2);
     }
 }
@@ -113,6 +124,9 @@ void EXTI2_IRQHandler() {
 void EXTI3_IRQHandler() {
     if (GET_REG(EXTI->PR1, EXTI_PR1_PIF3)) {
         int x = keypad_scan(3);
+        if(x != -1) {
+            key_num = x;
+        }
         SET_REG(EXTI->PR1, EXTI_PR1_PIF3, EXTI_PR1_PIF3);
     }
 }
@@ -175,15 +189,48 @@ int main(void)
     MX_GPIO_Init();
     MX_USART1_UART_Init();
     MX_SPI1_Init();
+	EPD_init();
     NVIC_config();
     EXTI_config();
+
     KEYPAD_PORT->BSRR |= KEYPAD_OUT_0;
     KEYPAD_PORT->BSRR |= KEYPAD_OUT_1;
     KEYPAD_PORT->BSRR |= KEYPAD_OUT_2;
     KEYPAD_PORT->BSRR |= KEYPAD_OUT_3;
+
     printf("Init Done\r\n");
 
-	EPD_test();
+	char text[20], ch;
+	int now = 0;
+	Paint_SelectImage(BlackImage);
+	Paint_ClearWindows(20, 15, 20 + Font20.Width * 15, 15 + Font20.Height, WHITE);
+	Paint_DrawString_EN(20, 15, "init done", &Font16, WHITE, BLACK);
+	EPD_2IN13_V2_DisplayPart(BlackImage);
+	while(1) {
+		if (USART1->ISR & USART_ISR_RXNE) {
+			ch = USART1->RDR;
+			text[now++] = ch;
+			if(ch == 0) {
+				Paint_SelectImage(BlackImage);
+				Paint_ClearWindows(20, 15, 20 + Font20.Width * 15, 15 + Font20.Height, WHITE);
+				Paint_DrawString_EN(20, 15, text, &Font16, WHITE, BLACK);
+				EPD_2IN13_V2_DisplayPart(BlackImage);
+				now = 0;
+				DEV_Delay_ms(1000);
+			}
+		}
+		if(key_num != -1){
+			char text[3];
+			text[0] = key_num + '0';
+			text[1] = 0;
+			key_num = -1;
+			Paint_SelectImage(BlackImage);
+			Paint_ClearWindows(20, 15, 20 + Font20.Width * 15, 15 + Font20.Height, WHITE);
+			Paint_DrawString_EN(20, 15, text, &Font16, WHITE, BLACK);
+			EPD_2IN13_V2_DisplayPart(BlackImage);
+			DEV_Delay_ms(1000);
+		}
+	}
 
     /* USER CODE END 2 */
 
@@ -267,7 +314,7 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-void EPD_test(void)
+void EPD_init(void)
 {
 	DEV_Module_Init();
 	EPD_2IN13_V2_Init(EPD_2IN13_V2_FULL);
@@ -275,12 +322,10 @@ void EPD_test(void)
 	DEV_Delay_ms(500);
 
 	//Create a new image cache
-	UBYTE *BlackImage;
 	/* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
 	UWORD Imagesize = ((EPD_2IN13_V2_WIDTH % 8 == 0)? (EPD_2IN13_V2_WIDTH / 8 ): (EPD_2IN13_V2_WIDTH / 8 + 1)) * EPD_2IN13_V2_HEIGHT;
 	if((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL) {
 	    printf("Failed to apply for black memory...\r\n");
-	    return -1;
 	}
 
 	Paint_NewImage(BlackImage, EPD_2IN13_V2_WIDTH, EPD_2IN13_V2_HEIGHT, 270, WHITE);
@@ -292,16 +337,6 @@ void EPD_test(void)
 
 	EPD_2IN13_V2_Init(EPD_2IN13_V2_PART);
 
-	Paint_SelectImage(BlackImage);
-
-	while(1) {
-		char text[20];
-		scanf("%s", text);
-		Paint_ClearWindows(20, 15, 20 + Font20.Width * 15, 15 + Font20.Height, WHITE);
-		Paint_DrawString_EN(20, 15, text, &Font16, WHITE, BLACK);
-		EPD_2IN13_V2_DisplayPart(BlackImage);
-		DEV_Delay_ms(1000)
-	}
 }
 /* USER CODE END 4 */
 
