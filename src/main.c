@@ -376,11 +376,14 @@ int main(void) {
 	int arror_pos = 0;
 	int message_offset = 0;
 	int now = 0;
+	int dialog_offset = 0;
 	char send_msg[30];
 	int send_now = 0;
 	int kb_state = 0;
 	send_msg[0] = 0;
 	char text[1000], ch;
+
+
 	while (1) {
 		if (USART1->ISR & USART_ISR_RXNE) {
 			ch = USART1->RDR;
@@ -398,17 +401,27 @@ int main(void) {
 					Clear_Arror(arror_pos);
 					arror_pos--;
 					if (arror_pos < 0) {
+						if(dialog_offset > 0) {
+							dialog_offset--;
+							Tele_getlist(dialog_offset);
+						}
 						arror_pos = 0;
 					}
-					Display_Arror(arror_pos);
+					else{
+						Display_Arror(arror_pos);
+					}
 				}
 				if (key_num == 11) { // down
 					Clear_Arror(arror_pos);
 					arror_pos++;
 					if (arror_pos > 4) {
-						arror_pos = 4;
+						dialog_offset++;
+						Tele_getlist(dialog_offset);
+						arror_pos = 0;
 					}
-					Display_Arror(arror_pos);
+					else{
+						Display_Arror(arror_pos);
+					}
 				}
 				if (key_num == 12) { // enter
 					Clear_Arror(arror_pos);
