@@ -67,7 +67,15 @@ void Error_Handler(void);
 #define SPI_CS_Pin GPIO_PIN_4
 #define SPI_CS_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
-
+#define KEYPAD_IN_0 GPIO_PIN_0
+#define KEYPAD_IN_1 GPIO_PIN_1
+#define KEYPAD_IN_2 GPIO_PIN_2
+#define KEYPAD_IN_3 GPIO_PIN_3
+#define KEYPAD_OUT_0 GPIO_PIN_4
+#define KEYPAD_OUT_1 GPIO_PIN_5
+#define KEYPAD_OUT_2 GPIO_PIN_6
+#define KEYPAD_OUT_3 GPIO_PIN_7
+#define KEYPAD_PORT GPIOC
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

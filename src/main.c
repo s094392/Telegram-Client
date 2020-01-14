@@ -44,7 +44,8 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define SET_REG(REG, SELECT, VAL) ((REG) = ((REG) & (~(SELECT))) | (VAL))
+#define GET_REG(REG, SELECT) ((REG) & (SELECT))
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -62,7 +63,86 @@ void EPD_test(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void EXTI_config() {
+    SET_REG(EXTI->IMR1, EXTI_IMR1_IM0, EXTI_IMR1_IM0);
+    SET_REG(EXTI->IMR1, EXTI_IMR1_IM1, EXTI_IMR1_IM1);
+    SET_REG(EXTI->IMR1, EXTI_IMR1_IM2, EXTI_IMR1_IM2);
+    SET_REG(EXTI->IMR1, EXTI_IMR1_IM3, EXTI_IMR1_IM3);
 
+    SET_REG(EXTI->RTSR1, EXTI_RTSR1_RT0, EXTI_RTSR1_RT0);
+    SET_REG(EXTI->RTSR1, EXTI_RTSR1_RT1, EXTI_RTSR1_RT1);
+    SET_REG(EXTI->RTSR1, EXTI_RTSR1_RT2, EXTI_RTSR1_RT2);
+    SET_REG(EXTI->RTSR1, EXTI_RTSR1_RT3, EXTI_RTSR1_RT3);
+
+    SET_REG(RCC->APB2ENR, RCC_APB2ENR_SYSCFGEN, RCC_APB2ENR_SYSCFGEN);
+
+    SET_REG(SYSCFG->EXTICR[0], SYSCFG_EXTICR1_EXTI0, SYSCFG_EXTICR1_EXTI0_PC);
+    SET_REG(SYSCFG->EXTICR[0], SYSCFG_EXTICR1_EXTI1, SYSCFG_EXTICR1_EXTI1_PC);
+    SET_REG(SYSCFG->EXTICR[0], SYSCFG_EXTICR1_EXTI2, SYSCFG_EXTICR1_EXTI2_PC);
+    SET_REG(SYSCFG->EXTICR[0], SYSCFG_EXTICR1_EXTI3, SYSCFG_EXTICR1_EXTI3_PC);
+}
+
+void NVIC_config() {
+    NVIC->ISER[0] |= 0b1 << EXTI0_IRQn;
+    NVIC->ISER[0] |= 0b1 << EXTI1_IRQn;
+    NVIC->ISER[0] |= 0b1 << EXTI2_IRQn;
+    NVIC->ISER[0] |= 0b1 << EXTI3_IRQn;
+}
+
+void EXTI0_IRQHandler() {
+    if (GET_REG(EXTI->PR1, EXTI_PR1_PIF0)) {
+        int x = keypad_scan(0);
+        SET_REG(EXTI->PR1, EXTI_PR1_PIF0, EXTI_PR1_PIF0);
+    }
+}
+
+void EXTI1_IRQHandler() {
+    if (GET_REG(EXTI->PR1, EXTI_PR1_PIF1)) {
+        int x = keypad_scan(1);
+        SET_REG(EXTI->PR1, EXTI_PR1_PIF1, EXTI_PR1_PIF1);
+    }
+}
+
+void EXTI2_IRQHandler() {
+    if (GET_REG(EXTI->PR1, EXTI_PR1_PIF2)) {
+        int x = keypad_scan(2);
+        SET_REG(EXTI->PR1, EXTI_PR1_PIF2, EXTI_PR1_PIF2);
+    }
+}
+
+void EXTI3_IRQHandler() {
+    if (GET_REG(EXTI->PR1, EXTI_PR1_PIF3)) {
+        int x = keypad_scan(3);
+        SET_REG(EXTI->PR1, EXTI_PR1_PIF3, EXTI_PR1_PIF3);
+    }
+}
+
+int keypad_scan(int target) {
+    int key_map[4][4] = {
+        {1, 4, 7, 15}, {2, 5, 8, 0}, {3, 6, 9, 14}, {10, 11, 12, 13}};
+    uint32_t x_pin[4] = {KEYPAD_OUT_0, KEYPAD_OUT_1, KEYPAD_OUT_2, KEYPAD_OUT_3};
+    uint32_t y_pin[4] = {KEYPAD_IN_0, KEYPAD_IN_1, KEYPAD_IN_2, KEYPAD_IN_3};
+    int result = -1;
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            if (i == j) {
+                KEYPAD_PORT->BSRR |= x_pin[j];
+            } else {
+                KEYPAD_PORT->BRR |= x_pin[j];
+            }
+        }
+        int cnt = 0;
+        for (int k = 0; k < 100; k++) {
+            uint32_t on = KEYPAD_PORT->IDR & y_pin[target];
+            if (on) cnt++;
+        }
+        if (cnt >= 99) result = key_map[i][target];
+    }
+    for (int j = 0; j < 4; j++) {
+        KEYPAD_PORT->BSRR |= x_pin[j];
+    }
+    return result;
+}
 /* USER CODE END 0 */
 
 /**
@@ -95,6 +175,12 @@ int main(void)
     MX_GPIO_Init();
     MX_USART1_UART_Init();
     MX_SPI1_Init();
+    NVIC_config();
+    EXTI_config();
+    KEYPAD_PORT->BSRR |= KEYPAD_OUT_0;
+    KEYPAD_PORT->BSRR |= KEYPAD_OUT_1;
+    KEYPAD_PORT->BSRR |= KEYPAD_OUT_2;
+    KEYPAD_PORT->BSRR |= KEYPAD_OUT_3;
     printf("Init Done\r\n");
 
 	EPD_test();
