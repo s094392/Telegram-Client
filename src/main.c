@@ -25,7 +25,9 @@
 #include "spi.h"
 #include "usart.h"
 #include "gpio.h"
+#include "jsmn.h"
 #include <stdio.h>
+#include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -57,7 +59,8 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-void EPD_test(void);
+void EPD_init(void);
+int keypad_scan(int target);
 UBYTE *BlackImage;
 int key_num = -1;
 
@@ -157,12 +160,95 @@ int keypad_scan(int target) {
     }
     return result;
 }
+
+void Tele_stop(void) {
+	printf("{\"cmd\": \"stop\"}\n");
+
+}
+
+void Tele_getlist(int offset) {
+	printf("{\"cmd\": \"getlist\", \"offset\": \"%d\"}\n", offset);
+}
+
+void Tele_send(char* id, char* msg) {
+	printf("{\"cmd\": \"sendmsg\", \"id\": \"%s\", \"msg\": \"%s\"}\n", id, msg);
+	printf("sent\n");
+}
 /* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
   * @retval int
   */
+void Display_Arror(int line) {
+	Paint_DrawString_EN(5, line * 25, ">", &Font16, WHITE, BLACK);
+	EPD_2IN13_V2_DisplayPart(BlackImage);
+}
+
+void Clear_Arror(int line) {
+	Paint_ClearWindows(0, line * 25, 19, line * 25 + Font20.Height - 1, WHITE);
+	EPD_2IN13_V2_DisplayPart(BlackImage);
+}
+
+void Display_Text(int line, char* text) {
+	if(strlen(text) > 20) {
+		text[20] = 0;
+	}
+	Paint_ClearWindows(20, line * 25, 250, line * 25 + Font20.Height - 1, WHITE);
+	Paint_DrawString_EN(20, line * 25, text, &Font16, WHITE, BLACK);
+	EPD_2IN13_V2_DisplayPart(BlackImage);
+}
+
+static int jsoneq(const char *json, jsmntok_t *tok, const char *s) {
+  if (tok->type == JSMN_STRING && (int)strlen(s) == tok->end - tok->start &&
+      strncmp(json + tok->start, s, tok->end - tok->start) == 0) {
+    return 0;
+  }
+  return -1;
+}
+
+void Parse_Json(char* JSON_STRING) {
+  int r;
+  jsmn_parser p;
+  jsmntok_t t[128]; /* We expect no more than 128 tokens */
+
+  jsmn_init(&p);
+  r = jsmn_parse(&p, JSON_STRING, strlen(JSON_STRING), t,
+				 sizeof(t) / sizeof(t[0]));
+
+  /* Loop over all keys of the root object */
+  char *type;
+  for (int i = 1; i < r; i++) {
+	if (jsoneq(JSON_STRING, &t[i], "type") == 0) {
+	  /* We may use strndup() to fetch string value */
+	  type = strndup(JSON_STRING + t[i + 1].start, t[i + 1].end - t[i + 1].start);
+	  i++;
+	} else if (jsoneq(JSON_STRING, &t[i], "data") == 0) {
+	  int j;
+
+	  if (t[i + 1].type != JSMN_ARRAY) {
+		continue; /* We expect groups to be an array of strings */
+	  }
+
+	  if(!strcmp(type, "list")) {
+		  char* dialog;
+		  for (j = 0; j < t[i + 1].size; j++) {
+			jsmntok_t *g = &t[i + j + 2];
+			dialog = strndup(JSON_STRING + g->start, g->end - g->start);
+			if (j<5){
+			  Display_Text(j, dialog);
+			}
+		  }
+	  }
+
+	  i += t[i + 1].size + 1;
+	} else {
+	  printf("Unexpected key: %.*s\n", t[i].end - t[i].start,
+			 JSON_STRING + t[i].start);
+	}
+  }
+}
+
 int main(void)
 {
     /* USER CODE BEGIN 1 */
@@ -200,51 +286,73 @@ int main(void)
 
     printf("Init Done\r\n");
 
-	char text[20], ch;
-	int now = 0;
 	Paint_SelectImage(BlackImage);
-	Paint_ClearWindows(20, 15, 20 + Font20.Width * 15, 15 + Font20.Height, WHITE);
-	Paint_DrawString_EN(20, 15, "init done", &Font16, WHITE, BLACK);
+
+	Paint_DrawLine(0, 20, 250, 20, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+	Paint_DrawLine(0, 45, 250, 45, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+	Paint_DrawLine(0, 70, 250, 70, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+	Paint_DrawLine(0, 95, 250, 95, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+	Paint_DrawLine(0, 120, 250, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+
 	EPD_2IN13_V2_DisplayPart(BlackImage);
+
+	Tele_getlist(0);
+//	Tele_send("777000", "fuck");
+
+	int state = 1;
+	int arror_pos = 0;
+	int now = 0;
+	Display_Arror(arror_pos);
+
+	char text[1000], ch;
 	while(1) {
 		if (USART1->ISR & USART_ISR_RXNE) {
 			ch = USART1->RDR;
 			text[now++] = ch;
 			if(ch == 0) {
-				Paint_SelectImage(BlackImage);
-				Paint_ClearWindows(20, 15, 20 + Font20.Width * 15, 15 + Font20.Height, WHITE);
-				Paint_DrawString_EN(20, 15, text, &Font16, WHITE, BLACK);
-				EPD_2IN13_V2_DisplayPart(BlackImage);
+				Parse_Json(text);
 				now = 0;
 				DEV_Delay_ms(1000);
 			}
 		}
+
 		if(key_num != -1){
-			char text[3];
-			text[0] = key_num + '0';
-			text[1] = 0;
-			key_num = -1;
-			Paint_SelectImage(BlackImage);
-			Paint_ClearWindows(20, 15, 20 + Font20.Width * 15, 15 + Font20.Height, WHITE);
-			Paint_DrawString_EN(20, 15, text, &Font16, WHITE, BLACK);
-			EPD_2IN13_V2_DisplayPart(BlackImage);
-			DEV_Delay_ms(1000);
+			if (state == 1) {
+				if (key_num == 8) {
+					Clear_Arror(arror_pos);
+					arror_pos ++;
+					if(arror_pos > 4) {
+						arror_pos = 4;
+					}
+					Display_Arror(arror_pos);
+
+				}
+				if (key_num == 2) {
+					Clear_Arror(arror_pos);
+					arror_pos --;
+					if(arror_pos < 0) {
+						arror_pos = 0;
+					}
+					Display_Arror(arror_pos);
+				}
+				if (key_num == 9) {
+					Tele_stop();
+				}
+				key_num = -1;
+			}
+			else {
+				char text[3];
+				text[0] = key_num + '0';
+				text[1] = 0;
+				key_num = -1;
+				Paint_SelectImage(BlackImage);
+				Paint_ClearWindows(20, 15, 20 + Font20.Width * 15, 15 + Font20.Height, WHITE);
+				Paint_DrawString_EN(20, 15, text, &Font16, WHITE, BLACK);
+				EPD_2IN13_V2_DisplayPart(BlackImage);
+				DEV_Delay_ms(1000);
+			}
 		}
 	}
-
-    /* USER CODE END 2 */
-
-    /* Infinite loop */
-    /* USER CODE BEGIN WHILE */
-    while (1) {
-
-        /* USER CODE END WHILE */
-
-        /* USER CODE BEGIN 3 */
-
-    }
-    /* USER CODE END 3 */
-
 }
 
 /**
