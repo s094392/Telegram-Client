@@ -48,6 +48,8 @@
 /* USER CODE BEGIN PM */
 #define SET_REG(REG, SELECT, VAL) ((REG) = ((REG) & (~(SELECT))) | (VAL))
 #define GET_REG(REG, SELECT) ((REG) & (SELECT))
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -382,6 +384,33 @@ int main(void) {
 	int kb_state = 0;
 	send_msg[0] = 0;
 	char text[1000], ch;
+	char tetris[24][12] = {};
+	char create_block = 1;
+	int cur_i = 0, cur_j = 6, cur_block = 0, cur_rotate = 0;
+
+	int blocki[7][4][4] = {
+	    {{0, 1, 2, 3}, {0, 0, 0, 0}, {0, 1, 2, 3}, {0, 0, 0, 0}},
+	    {{0, 0, 1, 1}, {0, 0, 1, 1}, {0, 0, 1, 1}, {0, 0, 1, 1}},
+
+	    {{0, 1, 1, 1}, {0, 0, 1, 2}, {0, 0, 0, 1}, {2, 2, 1, 0}},
+	    {{0, 1, 1, 1}, {2, 2, 1, 0}, {0, 0, 0, 1}, {0, 0, 1, 2}},
+
+	    {{0, 1, 1, 1}, {0, 1, 2, 1}, {0, 0, 0, 1}, {0, 1, 2, 1}},
+
+	    {{0, 0, 1, 1}, {0, 1, 1, 2}, {0, 0, 1, 1}, {0, 1, 1, 2}},
+	    {{0, 0, 1, 1}, {0, 1, 1, 2}, {0, 0, 1, 1}, {0, 1, 1, 2}}
+	    };
+	int blockj[7][4][4] = {
+	    {{0, 0, 0, 0}, {0, 1, 2, 3}, {0, 0, 0, 0}, {0, 1, 2, 3}},
+	    {{0, 1, 0, 1}, {0, 1, 0, 1}, {0, 1, 0, 1}, {0, 1, 0, 1}},
+
+	    {{0, 0, 1, 2}, {1, 0, 0, 0}, {0, 1, 2, 2}, {0, 1, 1, 1}},
+	    {{2, 2, 1, 0}, {1, 0, 0, 0}, {2, 1, 0, 0}, {0, 1, 1, 1}},
+
+	    {{0, -1, 0, 1}, {0, 0, 0, 1}, {-1, 0, 1, 0}, {0, 0, 0, -1}},
+
+	    {{1, 0, 0, -1}, {0, 0, 1, 1}, {1, 0, 0, -1}, {0, 0, 1, 1}},
+	    {{-1, 0, 0, 1}, {0, 0, -1, -1}, {-1, 0, 0, 1}, {0, 0, -1, -1}}};
 
 
 	while (1) {
@@ -395,7 +424,138 @@ int main(void) {
 			}
 		}
 
+		if (state == 3) {
+			if (create_block) {
+				for (int k = 0; k < 4; k++) {
+					int i = blocki[cur_block][cur_rotate][k];
+					int j = blockj[cur_block][cur_rotate][k] + cur_j;
+					if(tetris[i][j] == 1) {
+						state = 4;
+						break;
+					}
+				}
+				if (state == 4) continue;
+				create_block = 0;
+			}
+
+			Paint_SelectImage(BlackImage);
+			Paint_Clear(WHITE);
+			for (int k = 0; k < 4; k++) {
+				int i = blocki[cur_block][cur_rotate][k]+cur_i;
+				int j = blockj[cur_block][cur_rotate][k]+cur_j;
+				if (i >= 24 || tetris[i][j] == 1) {
+					create_block = 1;
+					break;
+				}
+				Paint_DrawRectangle(5 + i * 10, j * 10, 5 + i * 10 + 10, j * 10 + 10, BLACK, DOT_PIXEL_1X1, 1);
+			}
+
+			if (create_block) {
+				Paint_Clear(WHITE);
+				for (int k = 0; k < 4; k++) {
+					int i = blocki[cur_block][cur_rotate][k]+cur_i - 1;
+					int j = blockj[cur_block][cur_rotate][k]+cur_j;
+					tetris[i][j] = 1;
+				}
+
+				int lines = 0;
+				for (int i = 0; i < 24; i++) {
+					int comp = 1;
+					for (int j = 0; j < 12; j++) {
+						if(!tetris[i][j]) {
+							comp = 0;
+							break;
+						}
+					}
+					if (comp) lines++;
+				}
+
+				if (lines != 0) {
+					for (int i = 24; i > lines; i--) {
+						for (int j = 0; j < 12; j++) {
+							tetris[i][j] = tetris[i-lines][j];
+							tetris[i-lines][j] = 0;
+						}
+					}
+				}
+				cur_rotate = 0;
+				cur_i = 0;
+				cur_j = 6;
+				cur_block = (cur_block + 1) % 7;
+			} else {
+				cur_i++;
+			}
+
+			for (int i = 0; i < 24; i++) {
+				for (int j = 0; j < 12; j++) {
+					if(tetris[i][j] != 1) continue;
+					Paint_DrawRectangle(5 + i * 10, j * 10, 5 + i * 10 + 10, j * 10 + 10, BLACK, DOT_PIXEL_1X1, 1);
+				}
+			}
+
+			EPD_2IN13_V2_DisplayPart(BlackImage);
+		}
+
 		if (key_num != -1) {
+			if (state == 3) {
+				if (key_num == 8) {
+					int tmp_j = MAX(0, cur_j - 1);
+					int invalid = 0;
+					for (int k = 0; k < 4; k++) {
+						int i = blocki[cur_block][cur_rotate][k]+cur_i;
+						int j = blockj[cur_block][cur_rotate][k]+tmp_j;
+						if (i < 0 || i > 24 || j < 0 || j > 11 || tetris[i][j]) invalid = 1;
+					}
+					if (invalid) continue;
+					cur_j = tmp_j;
+				}
+
+				if (key_num == 2) {
+					int tmp_j = MIN(11, cur_j + 1);
+					int invalid = 0;
+					for (int k = 0; k < 4; k++) {
+						int i = blocki[cur_block][cur_rotate][k]+cur_i;
+						int j = blockj[cur_block][cur_rotate][k]+tmp_j;
+						if (i < 0 || i > 24 || j < 0 || j > 11 || tetris[i][j]) invalid = 1;
+					}
+					if (invalid) continue;
+					cur_j = tmp_j;
+				}
+
+				if (key_num == 6) {
+					int tmp_rotate = (cur_rotate + 1) % 4;
+					int invalid = 0;
+					for (int k = 0; k < 4; k++) {
+						int i = blocki[cur_block][tmp_rotate][k]+cur_i;
+						int j = blockj[cur_block][tmp_rotate][k]+cur_j;
+						if (i < 0 || i > 24 || j < 0 || j > 11 || tetris[i][j]) invalid = 1;
+					}
+					if (invalid) continue;
+					cur_rotate = tmp_rotate;
+				}
+
+			}
+			if (state == 3 || state == 4) {
+				if (key_num == 13) { // return
+					state = 1;
+					Tele_getlist(0);
+					state = 1;
+					arror_pos = 0;
+					send_msg[0] = 0;
+					send_now = 0;
+					Paint_SelectImage(BlackImage);
+
+					Paint_Clear(WHITE);
+					Paint_DrawLine(0, 20, 250, 20, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+					Paint_DrawLine(0, 45, 250, 45, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+					Paint_DrawLine(0, 70, 250, 70, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+					Paint_DrawLine(0, 95, 250, 95, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+					Paint_DrawLine(0, 120, 250, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+
+					EPD_2IN13_V2_DisplayPart(BlackImage);
+
+				}
+			}
 			if (state == 1) {
 				if (key_num == 10) { // up
 					Clear_Arror(arror_pos);
@@ -434,6 +594,12 @@ int main(void) {
 				}
 				if (key_num == 9) {
 					Tele_stop();
+				}
+				if (key_num == 0) {
+					Paint_SelectImage(BlackImage);
+					Paint_Clear(WHITE);
+					EPD_2IN13_V2_DisplayPart(BlackImage);
+					state = 3;
 				}
 			} else if (state == 2) {
 				//input
