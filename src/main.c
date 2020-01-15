@@ -458,7 +458,6 @@ int main(void) {
 					tetris[i][j] = 1;
 				}
 
-				int lines = 0;
 				for (int i = 0; i < 24; i++) {
 					int comp = 1;
 					for (int j = 0; j < 12; j++) {
@@ -467,21 +466,21 @@ int main(void) {
 							break;
 						}
 					}
-					if (comp) lines++;
-				}
-
-				if (lines != 0) {
-					for (int i = 24; i > lines; i--) {
-						for (int j = 0; j < 12; j++) {
-							tetris[i][j] = tetris[i-lines][j];
-							tetris[i-lines][j] = 0;
+					if (comp && i != 0) {
+						for (int ii = i-1; ii >=0; ii--) {
+							for (int j = 0; j < 12; j++) {
+								tetris[ii+1][j] = tetris[ii][j];
+								tetris[ii][j] = 0;
+							}
 						}
 					}
 				}
+
+
 				cur_rotate = 0;
 				cur_i = 0;
 				cur_j = 6;
-				cur_block = (cur_block + 1) % 7;
+				cur_block = ((cur_block + 1) * 17) % 7;
 			} else {
 				cur_i++;
 			}
@@ -498,7 +497,7 @@ int main(void) {
 
 		if (key_num != -1) {
 			if (state == 3) {
-				if (key_num == 8) {
+				if (key_num == 2) {
 					int tmp_j = MAX(0, cur_j - 1);
 					int invalid = 0;
 					for (int k = 0; k < 4; k++) {
@@ -510,7 +509,7 @@ int main(void) {
 					cur_j = tmp_j;
 				}
 
-				if (key_num == 2) {
+				if (key_num == 8) {
 					int tmp_j = MIN(11, cur_j + 1);
 					int invalid = 0;
 					for (int k = 0; k < 4; k++) {
@@ -522,7 +521,7 @@ int main(void) {
 					cur_j = tmp_j;
 				}
 
-				if (key_num == 6) {
+				if (key_num == 4) {
 					int tmp_rotate = (cur_rotate + 1) % 4;
 					int invalid = 0;
 					for (int k = 0; k < 4; k++) {
@@ -534,15 +533,29 @@ int main(void) {
 					cur_rotate = tmp_rotate;
 				}
 
+				if (key_num == 6) {
+					int tmp_i = cur_i + 1;
+					int invalid = 0;
+					for (int k = 0; k < 4; k++) {
+						int i = blocki[cur_block][cur_rotate][k]+tmp_i;
+						int j = blockj[cur_block][cur_rotate][k]+cur_j;
+						if (i < 0 || i > 24 || j < 0 || j > 11 || tetris[i][j]) invalid = 1;
+					}
+					if (invalid) continue;
+					tmp_i += 1;
+					for (int k = 0; k < 4; k++) {
+						int i = blocki[cur_block][cur_rotate][k]+tmp_i;
+						int j = blockj[cur_block][cur_rotate][k]+cur_j;
+						if (i < 0 || i > 24 || j < 0 || j > 11 || tetris[i][j]) invalid = 1;
+					}
+					if (invalid) continue;
+					cur_i = tmp_i;
+				}
+
 			}
 			if (state == 3 || state == 4) {
 				if (key_num == 13) { // return
-					state = 1;
-					Tele_getlist(0);
-					state = 1;
-					arror_pos = 0;
-					send_msg[0] = 0;
-					send_now = 0;
+
 					Paint_SelectImage(BlackImage);
 
 					Paint_Clear(WHITE);
@@ -554,6 +567,11 @@ int main(void) {
 
 					EPD_2IN13_V2_DisplayPart(BlackImage);
 
+					state = 1;
+					Tele_getlist(0);
+					arror_pos = 0;
+					send_msg[0] = 0;
+					send_now = 0;
 				}
 			}
 			if (state == 1) {
@@ -599,6 +617,11 @@ int main(void) {
 					Paint_SelectImage(BlackImage);
 					Paint_Clear(WHITE);
 					EPD_2IN13_V2_DisplayPart(BlackImage);
+
+					create_block = 1;
+					memset(tetris, 0, sizeof(tetris));
+					cur_i = 0, cur_j = 6, cur_block = (cur_block*17)%6, cur_rotate = 0;
+
 					state = 3;
 				}
 			} else if (state == 2) {
