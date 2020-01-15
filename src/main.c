@@ -315,6 +315,9 @@ void Parse_Json(char* JSON_STRING) {
 				if (!strcmp(isme, "True")) {
 					Display_Arror(0);
 				}
+				else{
+					Clear_Arror(0);
+				}
 				i++;
 			}
 
