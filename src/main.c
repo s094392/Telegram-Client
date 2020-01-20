@@ -500,7 +500,7 @@ int main(void) {
 
 		if (key_num != -1) {
 			if (state == 3) {
-				if (key_num == 2) {
+				if (key_num == 2 || key_num == 10) {
 					int tmp_j = MAX(0, cur_j - 1);
 					int invalid = 0;
 					for (int k = 0; k < 4; k++) {
@@ -512,7 +512,7 @@ int main(void) {
 					cur_j = tmp_j;
 				}
 
-				if (key_num == 8) {
+				if (key_num == 8 || key_num == 11) {
 					int tmp_j = MIN(11, cur_j + 1);
 					int invalid = 0;
 					for (int k = 0; k < 4; k++) {
@@ -524,7 +524,7 @@ int main(void) {
 					cur_j = tmp_j;
 				}
 
-				if (key_num == 4) {
+				if (key_num == 4 || key_num == 12) {
 					int tmp_rotate = (cur_rotate + 1) % 4;
 					int invalid = 0;
 					for (int k = 0; k < 4; k++) {
@@ -536,7 +536,7 @@ int main(void) {
 					cur_rotate = tmp_rotate;
 				}
 
-				if (key_num == 6) {
+				if (key_num == 6 || key_num == 3) {
 					int tmp_i = cur_i + 1;
 					int invalid = 0;
 					for (int k = 0; k < 4; k++) {
