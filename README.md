@@ -1,10 +1,10 @@
 # Telegram Client
-A Telegram client based on a STM32L476RG board, magic and trash
+A Telegram client based on a STM32L476RG board, magic and trash.
 
 I don't know what happened but it works.
 
 ## Features
-- Listing your friends and send/receive messages
+- List your friends and send/receive messages
 - A tetris game(?
 
 ## Hardware components
